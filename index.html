@@ -101,3 +101,87 @@
     </script>
 </body>
 </html>
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+let balls = [];
+let remainingTime = 5;
+let gameStarted = false;
+
+// Create 10 balls at random positions
+function generateBalls() {
+    balls = [];
+    for (let i = 0; i < 10; i++) {
+        let x = Math.random() * 750 + 50; // Random x position
+        let y = Math.random() * 550 + 50; // Random y position
+        balls.push({ x, y, radius: 20 });
+    }
+}
+
+// Broadcast the state to all connected clients
+function broadcastState() {
+    io.emit('newBall', balls);
+    io.emit('updateTime', remainingTime);
+}
+
+io.on('connection', (socket) => {
+    console.log('A user connected');
+
+    // When the game starts
+    if (gameStarted) {
+        socket.emit('gameStarted');
+        broadcastState();
+    }
+
+    // Start the game when a client requests it
+    socket.on('startGame', () => {
+        if (!gameStarted) {
+            gameStarted = true;
+            generateBalls();
+            broadcastState();
+            startTimer();
+        }
+    });
+
+    // Handle ball click (a ball was clicked by a player)
+    socket.on('ballClicked', (x, y) => {
+        balls = balls.filter(ball => !(ball.x === x && ball.y === y)); // Remove the clicked ball
+        io.emit('removeBall', x, y);  // Broadcast to all clients
+    });
+
+    // Update the timer and broadcast it to all clients
+    socket.on('updateTime', (time) => {
+        remainingTime = time;
+        if (remainingTime <= 0) {
+            gameStarted = false;
+            io.emit('gameOver');
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('A user disconnected');
+    });
+});
+
+// Start the timer countdown
+function startTimer() {
+    setInterval(() => {
+        if (gameStarted && remainingTime > 0) {
+            remainingTime--;
+            io.emit('updateTime', remainingTime);  // Broadcast to all clients
+        }
+        if (remainingTime <= 0) {
+            gameStarted = false;
+            io.emit('gameOver');  // Notify all clients the game is over
+        }
+    }, 1000);
+}
+
+server.listen(3000, () => {
+    console.log('Server running on http://localhost:3000');
+});
