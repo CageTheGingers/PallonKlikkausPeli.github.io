@@ -15,8 +15,26 @@
     <div id="timer">Time Left: 5</div>
     <canvas id="gameCanvas" width="800" height="600"></canvas>
 
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js"></script>
+
     <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID",
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.database(app);
+        
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const timerDisplay = document.getElementById('timer');
@@ -24,25 +42,25 @@
         let balls = [];
         let remainingTime = 5;
         let gameStarted = false;
-        const socket = io('https://your-replit-url.repl.co');  // Update with your Replit URL
 
-        // Listen for ball updates from the server
-        socket.on('newBall', (x, y) => {
-            // Add the new ball to the balls array
-            balls.push({ x, y, radius: 20 });
-            drawBalls();  // Re-render all balls
+        // Firebase Realtime Database reference
+        const ballsRef = db.ref('balls');
+        const timerRef = db.ref('timer');
+
+        // Listen for changes in the ball positions from Firebase
+        ballsRef.on('value', (snapshot) => {
+            const ballData = snapshot.val();
+            balls = Object.values(ballData || {}).map(ball => ({
+                x: ball.x,
+                y: ball.y,
+                radius: 20,
+            }));
+            drawBalls();
         });
 
-        // Listen for the ball removal event from the server
-        socket.on('removeBall', (x, y) => {
-            // Remove the clicked ball from the array
-            balls = balls.filter(ball => ball.x !== x || ball.y !== y);
-            drawBalls();  // Re-render all balls
-        });
-
-        // Listen for the timer update from the server
-        socket.on('updateTime', (time) => {
-            remainingTime = time;
+        // Listen for timer updates from Firebase
+        timerRef.on('value', (snapshot) => {
+            remainingTime = snapshot.val();
             timerDisplay.textContent = `Time Left: ${remainingTime}`;
             if (remainingTime <= 0) {
                 gameStarted = false;
@@ -72,33 +90,18 @@
             balls.forEach(ball => {
                 const dist = Math.sqrt((mouseX - ball.x) ** 2 + (mouseY - ball.y) ** 2);
                 if (dist <= ball.radius) {
-                    socket.emit('ballClicked', ball.x, ball.y);  // Send the click event to the server
+                    // Remove the clicked ball from Firebase
+                    ballsRef.once('value', (snapshot) => {
+                        const ballData = snapshot.val();
+                        for (let id in ballData) {
+                            if (ballData[id].x === ball.x && ballData[id].y === ball.y) {
+                                ballsRef.child(id).remove();  // Remove ball from Firebase
+                                break;
+                            }
+                        }
+                    });
                 }
             });
-        });
-
-        // Start the game
-        function startGame() {
-            gameStarted = true;
-            socket.emit('startGame');  // Notify the server to start the game
-
-            // Initial timer countdown
-            setInterval(() => {
-                if (gameStarted && remainingTime > 0) {
-                    remainingTime--;
-                    socket.emit('updateTime', remainingTime);  // Send timer update to server
-                }
-            }, 1000);
-        }
-
-        // Start the game automatically after page load
-        window.onload = () => {
-            startGame();
-        };
-
-        // Listen for when the game is ready to start and balls are generated
-        socket.on('gameStarted', () => {
-            startGame();
         });
     </script>
 </body>
