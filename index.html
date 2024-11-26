@@ -24,21 +24,19 @@
         let balls = [];
         let remainingTime = 5;
         let isGameActive = true;
-        const socket = io('http://localhost:12345');  // Connect to the C# server using Socket.IO
+        const socket = io('http://localhost:12345');  
 
-        // Listen for ball updates from the server
         socket.on('newBall', (x, y) => {
             balls.push({ x, y, radius: 20 });
             drawBalls();
         });
-
-        // Listen for remove ball updates from the server
+        
         socket.on('removeBall', (x, y) => {
             balls = balls.filter(ball => !(ball.x === x && ball.y === y));
             drawBalls();
         });
 
-        // Listen for the timer update
+        
         socket.on('updateTime', (time) => {
             remainingTime = time;
             timerDisplay.textContent = `Time Left: ${remainingTime}`;
@@ -48,7 +46,7 @@
             }
         });
 
-        // Draw the balls on the canvas
+    
         function drawBalls() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             balls.forEach(ball => {
@@ -75,7 +73,6 @@
             });
         });
 
-        // Initial drawing of balls
         function startGame() {
             setInterval(drawBalls, 1000 / 60);  // 60 FPS rendering
         }
