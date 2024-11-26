@@ -68,13 +68,13 @@
             balls.forEach(ball => {
                 const dist = Math.sqrt((mouseX - ball.x) ** 2 + (mouseY - ball.y) ** 2);
                 if (dist <= ball.radius) {
-                    socket.emit('ballClicked', ball.x, ball.y);  // Send ball click to the server
+                    socket.emit('ballClicked', ball.x, ball.y);  
                 }
             });
         });
 
         function startGame() {
-            setInterval(drawBalls, 1000 / 60);  // 60 FPS rendering
+            setInterval(drawBalls, 1000 / 60);  
         }
 
         startGame();
