@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ball Click Game</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        canvas { border: 1px solid black; display: block; margin: 20px auto; }
+        #timer { text-align: center; font-size: 24px; }
+    </style>
+</head>
+<body>
+    <h1>Ball Click Game</h1>
+    <div id="timer">Time Left: 5</div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const timerDisplay = document.getElementById('timer');
+
+        let balls = [];
+        let remainingTime = 5;
+        let isGameActive = true;
+        const socket = io('http://localhost:12345');  // Connect to the C# server using Socket.IO
+
+        // Listen for ball updates from the server
+        socket.on('newBall', (x, y) => {
+            balls.push({ x, y, radius: 20 });
+            drawBalls();
+        });
+
+        // Listen for remove ball updates from the server
+        socket.on('removeBall', (x, y) => {
+            balls = balls.filter(ball => !(ball.x === x && ball.y === y));
+            drawBalls();
+        });
+
+        // Listen for the timer update
+        socket.on('updateTime', (time) => {
+            remainingTime = time;
+            timerDisplay.textContent = `Time Left: ${remainingTime}`;
+            if (remainingTime <= 0) {
+                isGameActive = false;
+                alert('Game Over!');
+            }
+        });
+
+        // Draw the balls on the canvas
+        function drawBalls() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            balls.forEach(ball => {
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+                ctx.closePath();
+            });
+        }
+
+        // Handle mouse clicks to remove balls
+        canvas.addEventListener('click', (e) => {
+            if (!isGameActive) return;
+
+            const mouseX = e.offsetX;
+            const mouseY = e.offsetY;
+
+            balls.forEach(ball => {
+                const dist = Math.sqrt((mouseX - ball.x) ** 2 + (mouseY - ball.y) ** 2);
+                if (dist <= ball.radius) {
+                    socket.emit('ballClicked', ball.x, ball.y);  // Send ball click to the server
+                }
+            });
+        });
+
+        // Initial drawing of balls
+        function startGame() {
+            setInterval(drawBalls, 1000 / 60);  // 60 FPS rendering
+        }
+
+        startGame();
+    </script>
+</body>
+</html>
